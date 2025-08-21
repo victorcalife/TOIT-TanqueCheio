@@ -1,0 +1,257 @@
+# Documentação Técnica e Arquitetura - Aplicativo de Indicação de Menores Preços de Combustíveis
+
+## Sumário Executivo
+
+Este documento apresenta a arquitetura técnica completa do aplicativo de indicação de menores preços de combustíveis, incluindo especificações detalhadas de componentes, APIs, banco de dados, infraestrutura, e padrões de desenvolvimento. A arquitetura foi projetada para suportar alta escalabilidade, disponibilidade, e performance, utilizando tecnologias modernas e práticas de desenvolvimento ágil.
+
+O sistema adota uma arquitetura de microserviços distribuída, hospedada na plataforma Railway, com PostgreSQL como banco de dados principal e Redis para cache e message queues. A aplicação mobile é desenvolvida em React Native para máxima compatibilidade cross-platform, enquanto o backend utiliza Node.js com Express.js para APIs RESTful.
+
+## 1. Visão Geral da Arquitetura
+
+### 1.1 Princípios Arquiteturais
+
+A arquitetura do sistema foi concebida seguindo princípios fundamentais que garantem robustez, escalabilidade, e manutenibilidade a longo prazo. O primeiro princípio é a **separação de responsabilidades**, onde cada componente do sistema tem uma função específica e bem definida, facilitando desenvolvimento paralelo, testes independentes, e manutenção isolada.
+
+O segundo princípio fundamental é a **escalabilidade horizontal**, permitindo que diferentes componentes do sistema sejam escalados independentemente conforme demanda. Esta abordagem é essencial para um aplicativo que pode experimentar picos de tráfego significativos durante feriados, fins de semana, e horários de rush urbano.
+
+O terceiro princípio é a **resiliência e tolerância a falhas**, implementada através de circuit breakers, retry policies, e fallbacks automáticos. Considerando que o aplicativo depende de múltiplas APIs externas (Google Maps, Waze, sistemas de parceiros), a arquitetura deve continuar funcionando mesmo quando alguns serviços externos estão indisponíveis.
+
+### 1.2 Padrões Arquiteturais Adotados
+
+**Microserviços com API Gateway**
+O sistema utiliza arquitetura de microserviços com um API Gateway centralizado que gerencia autenticação, rate limiting, logging, e roteamento de requests. Esta abordagem permite desenvolvimento e deployment independente de cada serviço, facilitando escalabilidade e manutenção.
+
+**Event-Driven Architecture**
+Comunicação assíncrona entre serviços é implementada através de eventos e message queues, reduzindo acoplamento e melhorando performance. Eventos críticos incluem atualizações de preços, novos cadastros de usuários, e transações de cupons.
+
+**CQRS (Command Query Responsibility Segregation)**
+Separação entre operações de leitura e escrita otimiza performance para consultas frequentes de preços e rotas, enquanto mantém consistência para operações de atualização menos frequentes.
+
+### 1.3 Stack Tecnológico Detalhado
+
+**Backend Services:**
+- **Runtime:** Node.js 18+ LTS para performance e compatibilidade
+- **Framework:** Express.js 4.18+ para APIs RESTful
+- **Database:** PostgreSQL 14+ com extensão PostGIS para dados geoespaciais
+- **Cache:** Redis 7+ para cache de sessões, dados temporários, e message queues
+- **Authentication:** JWT com refresh tokens para segurança stateless
+- **API Documentation:** Swagger/OpenAPI 3.0 para documentação automática
+
+**Mobile Application:**
+- **Framework:** React Native 0.72+ para desenvolvimento cross-platform
+- **Navigation:** React Navigation 6+ para navegação nativa
+- **State Management:** Redux Toolkit para gerenciamento de estado
+- **Maps:** react-native-maps com Google Maps SDK
+- **HTTP Client:** Axios com interceptors para autenticação automática
+- **Local Storage:** AsyncStorage para persistência local
+
+**Infrastructure:**
+- **Platform:** Railway para hosting e deployment automático
+- **CI/CD:** GitHub Actions para integração e deployment contínuo
+- **Monitoring:** Railway built-in monitoring + custom metrics
+- **Logging:** Structured logging com Winston para análise centralizada
+- **Security:** HTTPS obrigatório, rate limiting, input validation
+
+## 2. Arquitetura de Microserviços
+
+### 2.1 API Gateway
+
+O API Gateway serve como ponto de entrada único para todas as requisições do aplicativo mobile e interfaces web. Implementado em Node.js com Express.js, o gateway gerencia funcionalidades transversais que não pertencem a nenhum microserviço específico.
+
+**Responsabilidades do API Gateway:**
+
+**Autenticação e Autorização:** Validação de tokens JWT em todas as requisições protegidas, com suporte a refresh tokens automático e blacklist de tokens revogados. O sistema implementa diferentes níveis de autorização baseados em roles (usuário gratuito, premium, admin, parceiro).
+
+**Rate Limiting:** Proteção contra abuso através de rate limiting configurável por endpoint e por usuário. Usuários premium têm limites mais altos, enquanto usuários gratuitos têm restrições mais conservadoras para proteger recursos do sistema.
+
+**Request/Response Transformation:** Normalização de requests e responses entre diferentes versões de API, permitindo evolução backward-compatible. Inclui validação de schemas de entrada e formatação consistente de respostas de erro.
+
+**Logging e Monitoring:** Logging estruturado de todas as requisições com correlation IDs para rastreamento distribuído. Métricas de performance são coletadas automaticamente para análise de bottlenecks e otimização.
+
+**Load Balancing:** Distribuição inteligente de carga entre instâncias de microserviços, com health checks automáticos e remoção de instâncias não responsivas do pool de balanceamento.
+
+### 2.2 Serviço de Autenticação
+
+Microserviço dedicado ao gerenciamento de usuários, autenticação, e autorização. Implementa padrões de segurança modernos e suporta diferentes tipos de usuários (consumidores finais, parceiros, administradores).
+
+**Funcionalidades Core:**
+
+**Gestão de Usuários:** CRUD completo de usuários com validação de dados, verificação de email, e gestão de perfis. Suporta diferentes tipos de conta com permissões específicas para cada role.
+
+**Autenticação JWT:** Implementação robusta de autenticação baseada em JWT com access tokens de curta duração (15 minutos) e refresh tokens de longa duração (30 dias). Tokens incluem claims customizados para otimizar autorizações.
+
+**OAuth Integration:** Suporte futuro para login social (Google, Facebook, Apple) através de OAuth 2.0, reduzindo friction no onboarding de novos usuários.
+
+**Password Security:** Hash de senhas com bcrypt e salt aleatório, políticas de senha configuráveis, e detecção de senhas comprometidas através de integração com bases de dados de vazamentos.
+
+**Session Management:** Gestão de sessões ativas com capacidade de revogação remota, detecção de login simultâneo suspeito, e logout automático por inatividade.
+
+### 2.3 Serviço de Geolocalização e Rotas
+
+Microserviço responsável por todas as operações relacionadas a geolocalização, cálculo de rotas, e integração com APIs de mapas. Este é um dos serviços mais críticos do sistema, pois suporta a funcionalidade core do aplicativo.
+
+**Componentes Principais:**
+
+**Geocoding Service:** Conversão entre endereços textuais e coordenadas geográficas, com cache agressivo para endereços frequentemente consultados. Implementa fallback entre múltiplos provedores (Google Maps, OpenStreetMap) para garantir disponibilidade.
+
+**Route Calculation:** Cálculo de rotas otimizadas considerando diferentes critérios (tempo, distância, evitar pedágios). Integra com Google Directions API e implementa algoritmos proprietários para otimização específica do domínio.
+
+**POI Discovery:** Identificação de pontos de interesse (postos de combustível) ao longo de rotas calculadas, considerando desvios máximos configuráveis e preferências do usuário.
+
+**Spatial Queries:** Consultas geoespaciais otimizadas utilizando índices PostGIS para busca eficiente de postos por proximidade, região, ou ao longo de rotas específicas.
+
+**Cache Strategy:** Sistema de cache em múltiplas camadas (Redis, CDN, local) para otimizar performance e reduzir custos de APIs externas. Cache inteligente considera padrões de tráfego e invalida dados baseado em TTL dinâmico.
+
+### 2.4 Serviço de Preços e Dados
+
+Microserviço dedicado à coleta, validação, e gestão de dados de preços de combustíveis. Implementa múltiplas estratégias de coleta de dados e algoritmos de validação para garantir qualidade e atualidade das informações.
+
+**Subsistemas de Coleta:**
+
+**Web Scraping Engine:** Framework robusto para coleta automatizada de preços de fontes públicas, com suporte a JavaScript rendering, proxy rotation, e detecção de mudanças em estruturas de sites. Implementa rate limiting respeitoso e user-agent rotation.
+
+**Partner API Integration:** APIs RESTful para recebimento de dados de parceiros em tempo real, com autenticação por API key, validação de schemas, e rate limiting por parceiro. Suporta diferentes formatos de dados e normalização automática.
+
+**Crowdsourcing Platform:** Sistema para coleta de dados através de usuários, com gamificação, sistema de reputação, e validação cruzada. Implementa algoritmos de detecção de spam e dados maliciosos.
+
+**Data Validation Pipeline:** Pipeline de validação em tempo real que aplica regras de negócio, detecção de outliers, e validação cruzada entre fontes. Utiliza machine learning para identificar padrões anômalos e melhorar qualidade dos dados.
+
+**Historical Data Management:** Armazenamento e análise de dados históricos para identificação de tendências, previsão de preços, e otimização de algoritmos de recomendação.
+
+### 2.5 Serviço de Recomendações
+
+Microserviço que implementa o algoritmo core de recomendação de postos, considerando múltiplas variáveis para calcular economia real. Este serviço diferencia o aplicativo da concorrência através de recomendações inteligentes e personalizadas.
+
+**Engine de Recomendação:**
+
+**Multi-Factor Algorithm:** Algoritmo proprietário que considera preço do combustível, distância do desvio, consumo adicional estimado, tempo de viagem adicional, condições de trânsito, e preferências pessoais do usuário.
+
+**Personalization Engine:** Sistema de personalização baseado em histórico do usuário, padrões de comportamento, e feedback explícito. Utiliza collaborative filtering e content-based filtering para melhorar recomendações.
+
+**Real-Time Optimization:** Otimização em tempo real considerando condições atuais de trânsito, disponibilidade de combustível, e promoções ativas. Integra com APIs de trânsito para ajustar recomendações dinamicamente.
+
+**A/B Testing Framework:** Framework integrado para testes A/B de diferentes algoritmos e parâmetros, permitindo otimização contínua baseada em métricas de conversão e satisfação do usuário.
+
+**Machine Learning Pipeline:** Pipeline de ML para análise de padrões, previsão de comportamento, e otimização automática de parâmetros do algoritmo. Inclui retreino automático baseado em novos dados.
+
+### 2.6 Serviço de Cupons e Monetização
+
+Microserviço responsável por toda a lógica de cupons, descontos, e monetização do aplicativo. Integra com sistemas de pagamento e gerencia o ciclo de vida completo de cupons e assinaturas.
+
+**Gestão de Cupons:**
+
+**Coupon Engine:** Sistema flexível de criação e gestão de cupons com suporte a diferentes tipos (percentual, valor fixo, cashback), regras de aplicação complexas, e limitações de uso.
+
+**Validation System:** Validação em tempo real de cupons considerando elegibilidade do usuário, validade temporal, limitações geográficas, e regras de parceiros.
+
+**Fraud Detection:** Sistema de detecção de fraudes que monitora padrões de uso suspeitos, múltiplas contas, e tentativas de abuso do sistema de cupons.
+
+**Partner Integration:** APIs para integração com sistemas de parceiros, permitindo validação de cupons no ponto de venda e reconciliação automática de transações.
+
+**Analytics and Reporting:** Dashboards e relatórios detalhados sobre performance de cupons, ROI de campanhas, e análise de comportamento de usuários.
+
+
+## 3. Arquitetura de Banco de Dados
+
+### 3.1 Modelo de Dados Principal (PostgreSQL)
+
+O banco de dados principal utiliza PostgreSQL com a extensão PostGIS para suporte nativo a dados geoespaciais. A modelagem segue princípios de normalização para garantir integridade referencial, com desnormalização estratégica em tabelas de alta consulta para otimizar performance.
+
+**Entidades Core:**
+
+**Users Table:**
+```sql
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    first_name VARCHAR(100) NOT NULL,
+    last_name VARCHAR(100) NOT NULL,
+    phone VARCHAR(20),
+    user_type VARCHAR(20) DEFAULT 'consumer' CHECK (user_type IN ('consumer', 'partner', 'admin')),
+    subscription_tier VARCHAR(20) DEFAULT 'free' CHECK (subscription_tier IN ('free', 'premium', 'enterprise')),
+    email_verified BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_login_at TIMESTAMP WITH TIME ZONE,
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_type_tier ON users(user_type, subscription_tier);
+```
+
+**Gas Stations Table:**
+```sql
+CREATE TABLE gas_stations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    brand VARCHAR(100),
+    address TEXT NOT NULL,
+    city VARCHAR(100) NOT NULL,
+    state VARCHAR(2) NOT NULL,
+    postal_code VARCHAR(10),
+    location GEOMETRY(POINT, 4326) NOT NULL,
+    phone VARCHAR(20),
+    operating_hours JSONB,
+    amenities TEXT[],
+    partner_id UUID REFERENCES partners(id),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_gas_stations_location ON gas_stations USING GIST(location);
+CREATE INDEX idx_gas_stations_city_state ON gas_stations(city, state);
+CREATE INDEX idx_gas_stations_brand ON gas_stations(brand);
+```
+
+**Fuel Prices Table:**
+```sql
+CREATE TABLE fuel_prices (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    gas_station_id UUID NOT NULL REFERENCES gas_stations(id),
+    fuel_type VARCHAR(20) NOT NULL CHECK (fuel_type IN ('gasoline', 'ethanol', 'diesel', 'premium')),
+    price DECIMAL(5,3) NOT NULL,
+    source VARCHAR(50) NOT NULL,
+    source_confidence DECIMAL(3,2) DEFAULT 0.5,
+    reported_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_active BOOLEAN DEFAULT TRUE
+);
+
+CREATE INDEX idx_fuel_prices_station_type ON fuel_prices(gas_station_id, fuel_type);
+CREATE INDEX idx_fuel_prices_reported_at ON fuel_prices(reported_at DESC);
+CREATE INDEX idx_fuel_prices_active ON fuel_prices(is_active) WHERE is_active = TRUE;
+```
+
+**Routes Table:**
+```sql
+CREATE TABLE routes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    origin_address TEXT NOT NULL,
+    destination_address TEXT NOT NULL,
+    origin_location GEOMETRY(POINT, 4326) NOT NULL,
+    destination_location GEOMETRY(POINT, 4326) NOT NULL,
+    route_geometry GEOMETRY(LINESTRING, 4326),
+    distance_km DECIMAL(8,2),
+    duration_minutes INTEGER,
+    route_type VARCHAR(20) DEFAULT 'fastest',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_routes_user_id ON routes(user_id);
+CREATE INDEX idx_routes_created_at ON routes(created_at DESC);
+CREATE INDEX idx_routes_geometry ON routes USING GIST(route_geometry);
+```
+
+### 3.2 Cache Strategy (Redis)
+
+Redis é utilizado para múltiplas finalidades de cache e armazenamento temporário, otimizando performance e reduzindo carga no banco principal.
+
+**Cache Layers:**
+
+**Session Cache:** Armazenamento de sessões de usuário com TTL configurável baseado no tipo de usuário. Sessões premium têm TTL mais longo para melhor experiência.
+
+**API Response Cache:** Cache de respostas de APIs externas (Google Maps, weather, traffic) com TTL baseado na volatilidade dos dados. Rotas têm TTL de 30 minutos, enquanto geocoding tem TTL de 24 horas.
