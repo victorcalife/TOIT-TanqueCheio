@@ -87,6 +87,16 @@ config = {
 
 def get_config():
     """Retorna a configuração baseada no ambiente"""
-    env = os.environ.get('NODE_ENV', 'development')
+    env = os.environ.get('FLASK_ENV', 'development')
     return config.get(env, config['default'])
 
+def config_by_name(config_name):
+    """Retorna a classe de configuração pelo nome
+    
+    Args:
+        config_name (str): Nome da configuração ('development', 'production', 'testing')
+        
+    Returns:
+        class: Classe de configuração solicitada
+    """
+    return config.get(config_name, config['default'])
