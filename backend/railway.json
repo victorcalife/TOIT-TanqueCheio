@@ -4,7 +4,7 @@
     "buildCommand": "pip install -r requirements.txt"
   },
   "deploy": {
-    "startCommand": "cd src && gunicorn --bind 0.0.0.0:$PORT main:create_app()",
+    "startCommand": "cd src && gunicorn --bind 0.0.0.0:$PORT main:create_app",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }

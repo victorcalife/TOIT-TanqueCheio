@@ -7,8 +7,14 @@ from src.services.google_maps import google_maps_service
 from src.services.fuel_scraper import fuel_scraper
 from datetime import datetime, timezone, timedelta
 import uuid
+from sqlalchemy import or_
 
 gas_stations_bp = Blueprint('gas_stations', __name__)
+
+# Cache for POI searches to avoid redundant API calls
+from functools import lru_cache
+from datetime import timedelta
+from sqlalchemy import or_
 
 @gas_stations_bp.route('/', methods=['GET'])
 def get_gas_stations():
@@ -431,6 +437,66 @@ def get_station_prices(station_id):
             'error': 'Erro ao obter histórico de preços'
         }), 500
 
+@gas_stations_bp.route('/search/poi', methods=['GET'])
+def search_by_poi():
+    """
+    Search for gas stations near a Point of Interest (POI)
+    
+    Query Parameters:
+    - poi: Name or address of the POI (required)
+    - radius_km: Search radius in kilometers (default: 5)
+    - limit: Maximum number of results (default: 10, max: 20)
+    - fuel_type: Filter by fuel type (optional)
+    """
+    try:
+        # Get query parameters
+        poi = request.args.get('poi')
+        if not poi:
+            return jsonify({'error': 'POI name or address is required'}), 400
+            
+        radius_km = float(request.args.get('radius_km', 5))
+        limit = min(int(request.args.get('limit', 10)), 20)
+        fuel_type = request.args.get('fuel_type')
+        
+        # Get coordinates for POI using Google Maps Geocoding API
+        geocode_result = google_maps_service.geocode(poi)
+        if not geocode_result or 'results' not in geocode_result or not geocode_result['results']:
+            return jsonify({'error': 'Could not find the specified POI'}), 404
+            
+        location = geocode_result['results'][0]['geometry']['location']
+        latitude = location['lat']
+        longitude = location['lng']
+        
+        # Find nearby gas stations
+        nearby_stations = GasStation.find_nearby(
+            latitude=latitude,
+            longitude=longitude,
+            radius_km=radius_km,
+            fuel_type=fuel_type,
+            limit=limit
+        )
+        
+        # Add distance information to each station
+        for station in nearby_stations:
+            station['distance_km'] = GasStation.calculate_distance(
+                latitude, longitude,
+                float(station['latitude']), float(station['longitude'])
+            )
+        
+        return jsonify({
+            'success': True,
+            'poi': poi,
+            'poi_location': {'lat': latitude, 'lng': longitude},
+            'radius_km': radius_km,
+            'count': len(nearby_stations),
+            'results': nearby_stations
+        })
+        
+    except Exception as e:
+        current_app.logger.error(f"Error in search_by_poi: {str(e)}")
+        return jsonify({'error': 'Failed to search gas stations by POI'}), 500
+
+
 @gas_stations_bp.route('/<station_id>/coupons', methods=['GET'])
 def get_station_coupons(station_id):
     """Get active coupons for a gas station"""
@@ -460,4 +526,3 @@ def get_station_coupons(station_id):
             'success': False,
             'error': 'Erro ao obter cupons'
         }), 500
-
