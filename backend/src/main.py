@@ -16,7 +16,7 @@ def create_app(config_name='dev'):
     app = Flask(__name__)
     
     # Configuração da aplicação
-    config_object = config_by_name.get(config_name)
+    config_object = config_by_name(config_name)
     if not config_object:
         raise ValueError(f"Configuração '{config_name}' não encontrada.")
     app.config.from_object(config_object)
@@ -25,7 +25,12 @@ def create_app(config_name='dev'):
     jwt = JWTManager(app)
     
     # Inicializar banco de dados PostgreSQL
-    init_database(app)
+    db.init_app(app)
+    
+    # Criar tabelas se não existirem (apenas em desenvolvimento)
+    if app.config.get('ENV') == 'development':
+        with app.app_context():
+            db.create_all()
     
     # CORS simples
     @app.after_request

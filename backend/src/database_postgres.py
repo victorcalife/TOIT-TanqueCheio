@@ -1,48 +1,15 @@
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 import os
 
 # Instância global do SQLAlchemy
 db = SQLAlchemy()
-migrate = Migrate()
 
 def init_database(app):
-    """Inicializa o banco de dados com a aplicação Flask"""
-    
-    # Configurar SQLAlchemy
-    db.init_app(app)
-    migrate.init_app(app, db)
-    
-    # Criar tabelas se não existirem
-    with app.app_context():
-        try:
-            # Importar todos os modelos para garantir que sejam criados
-            from models.user import User
-            from models.user_profile import UserProfile
-            from models.gas_station import GasStation, FuelPrice
-            from models.partner import Partner
-            from models.route import Route
-            from models.gps_tracking import GPSTracking, Trip, Notification
-            from models.coupon import Coupon
-            
-            print("📊 Criando tabelas no PostgreSQL...")
-            db.create_all()
-            print("✅ Tabelas criadas com sucesso!")
-            
-            # Verificar se há dados de exemplo
-            if User.query.count() == 0:
-                print("📝 Populando dados de exemplo...")
-                populate_sample_data()
-                print("✅ Dados de exemplo criados!")
-            
-        except Exception as e:
-            print(f"❌ Erro ao inicializar banco: {e}")
-            # Em caso de erro, tentar criar tabelas individualmente
-            try:
-                db.create_all()
-                print("✅ Tabelas criadas em segunda tentativa!")
-            except Exception as e2:
-                print(f"❌ Erro crítico no banco: {e2}")
+    """
+    Função mantida para compatibilidade com código existente.
+    A inicialização do banco de dados agora é feita no main.py
+    """
+    pass
 
 def populate_sample_data():
     """Popula dados de exemplo no PostgreSQL"""
@@ -54,6 +21,13 @@ def populate_sample_data():
         from models.coupon import Coupon
         from werkzeug.security import generate_password_hash
         from datetime import datetime, timedelta
+        
+        # Verificar se já existem usuários
+        if User.query.count() > 0:
+            print("ℹ️  Já existem dados no banco. Pulando população de dados de exemplo.")
+            return
+            
+        print("📝 Populando dados de exemplo...")
         
         # Criar usuário de exemplo
         user = User(
@@ -85,6 +59,9 @@ def populate_sample_data():
                 'address': 'BR-101, Km 142, Balneário Camboriú - SC',
                 'latitude': -26.9194,
                 'longitude': -49.0661,
+                'city': 'Balneário Camboriú',
+                'state': 'SC',
+                'is_active': True,
                 'fuels': {
                     'gasoline': 5.82,
                     'ethanol': 4.15,
@@ -97,6 +74,9 @@ def populate_sample_data():
                 'address': 'Av. Brasil, 1500, Centro, Balneário Camboriú - SC',
                 'latitude': -26.9766,
                 'longitude': -48.6354,
+                'city': 'Balneário Camboriú',
+                'state': 'SC',
+                'is_active': True,
                 'fuels': {
                     'gasoline': 5.67,
                     'ethanol': 4.02,
@@ -110,6 +90,9 @@ def populate_sample_data():
                 'address': 'BR-470, Km 89, Navegantes - SC',
                 'latitude': -26.8986,
                 'longitude': -48.6516,
+                'city': 'Navegantes',
+                'state': 'SC',
+                'is_active': True,
                 'fuels': {
                     'gasoline': 5.73,
                     'ethanol': 4.08,
