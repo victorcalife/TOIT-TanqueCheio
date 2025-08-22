@@ -5,24 +5,26 @@ from datetime import datetime, timedelta
 import os
 import sys
 import traceback
+from database_postgres import db, init_database, test_connection, get_db_stats
+from config_postgres import config_by_name
 
 # Configuração do sistema
 sys.path.append(os.path.dirname(__file__))
 
-def create_app():
+def create_app(config_name='dev'):
     """Factory function para criar a aplicação Flask"""
     app = Flask(__name__)
     
     # Configuração da aplicação
-    from config_postgres import get_config
-    config_class = get_config()
-    app.config.from_object(config_class)
+    config_object = config_by_name.get(config_name)
+    if not config_object:
+        raise ValueError(f"Configuração '{config_name}' não encontrada.")
+    app.config.from_object(config_object)
     
     # Inicializar extensões
     jwt = JWTManager(app)
     
     # Inicializar banco de dados PostgreSQL
-    from database_postgres import init_database, db, test_connection, get_db_stats
     init_database(app)
     
     # CORS simples
@@ -550,7 +552,8 @@ except Exception as e:
     app = create_app()
 
 if __name__ == '__main__':
+    config_name = os.getenv('FLASK_CONFIG', 'dev')
+    app = create_app(config_name)
     port = int(os.environ.get('PORT', 8080))
-    print(f"🚀 Iniciando Tanque Cheio API PostgreSQL na porta {port}")
-    app.run(host='0.0.0.0', port=port, debug=False)
-
+    print(f"🚀 Iniciando Tanque Cheio API PostgreSQL no modo '{config_name}' na porta {port}")
+    app.run(host='0.0.0.0', port=port)
