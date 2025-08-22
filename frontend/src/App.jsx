@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-
-const API_BASE_URL = 'https://j6h5i7cpj5zy.manus.space/api';
+import { API_BASE_URL } from './config';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -96,10 +95,12 @@ function App() {
     setLoading(true);
 
     try {
+      console.log('Tentando fazer login com:', { email: formData.email });
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           email: formData.email,
@@ -107,20 +108,30 @@ function App() {
         })
       });
 
-      const data = await response.json();
+      console.log('Resposta do servidor:', {
+        status: response.status,
+        statusText: response.statusText
+      });
 
-      if (data.success) {
+      const data = await response.json().catch(() => ({}));
+      console.log('Dados da resposta:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || `Erro HTTP: ${response.status}`);
+      }
+
+      if (data.access_token) {
         setToken(data.access_token);
         localStorage.setItem('token', data.access_token);
-        setUser(data.user);
+        setUser(data.user || { email: formData.email });
         setCurrentView('dashboard');
         setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
       } else {
-        alert(data.error || 'Erro no login');
+        throw new Error(data.error || 'Credenciais inválidas');
       }
     } catch (error) {
       console.error('Erro no login:', error);
-      alert('Erro de conexão');
+      alert(`Falha no login: ${error.message || 'Verifique suas credenciais e tente novamente'}`);
     } finally {
       setLoading(false);
     }

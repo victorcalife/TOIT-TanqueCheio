@@ -15,7 +15,7 @@ from src.routes.clean_gas_stations import clean_gas_stations_bp
 def create_clean_app(config_name=None):
     """Application factory pattern - versão limpa"""
     if config_name is None:
-        config_name = os.getenv('NODE_ENV', 'development')
+        config_name = os.getenv('NODE_ENV', 'production')
     
     app = Flask(__name__)
     
@@ -110,7 +110,7 @@ app = create_clean_app()
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 8080))
-    debug = os.getenv('NODE_ENV', 'development') == 'development'
+    debug = os.getenv('NODE_ENV', 'production') == 'production'
     
     with app.app_context():
         # Create database tables

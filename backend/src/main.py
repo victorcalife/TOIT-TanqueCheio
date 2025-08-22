@@ -28,7 +28,7 @@ def create_app(config_name='dev'):
     db.init_app(app)
     
     # Criar tabelas se não existirem (apenas em desenvolvimento)
-    if app.config.get('ENV') == 'development':
+    if app.config.get('ENV') == 'production':
         with app.app_context():
             db.create_all()
     

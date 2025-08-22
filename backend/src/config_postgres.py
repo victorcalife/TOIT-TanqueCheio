@@ -20,7 +20,7 @@ class Config:
     
     # API Configuration
     API_URL = os.environ.get('API_URL', 'localhost:8080')
-    NODE_ENV = os.environ.get('NODE_ENV', 'development')
+    NODE_ENV = os.environ.get('NODE_ENV', 'production')
     PORT = int(os.environ.get('PORT', 8080))
     
     # Google Maps API
@@ -82,12 +82,12 @@ config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'testing': TestingConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig
 }
 
 def get_config():
     """Retorna a configuração baseada no ambiente"""
-    env = os.environ.get('FLASK_ENV', 'development')
+    env = os.environ.get('FLASK_ENV', 'production')
     return config.get(env, config['default'])
 
 def config_by_name(config_name):

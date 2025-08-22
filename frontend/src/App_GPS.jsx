@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
-
-const API_BASE_URL = 'https://60h5imc095np.manus.space/api';
+import { API_BASE_URL } from './config';
 
 function App() {
   const [user, setUser] = useState(null);

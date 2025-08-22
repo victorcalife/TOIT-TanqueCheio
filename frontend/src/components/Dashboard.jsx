@@ -18,6 +18,9 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { useLocation } from '../contexts/LocationContext'
+import { formatDistanceToNow } from 'date-fns'
+import ptBR from 'date-fns/locale/pt-BR'
+import { API_BASE_URL } from '../config'
 
 const Dashboard = () => {
   const { user, profile } = useAuth()
@@ -36,8 +39,6 @@ const Dashboard = () => {
   const [nearbyStations, setNearbyStations] = useState([])
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(false)
-
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
 
   // Fetch nearby stations when location changes
   useEffect(() => {
