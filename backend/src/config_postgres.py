@@ -5,7 +5,7 @@ class Config:
     """Configuração base da aplicação"""
     
     # Database Configuration
-    DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:WWyaQJVrqJqmryQNcKdIyQBjGsPIbsXJ@interchange.proxy.rlwy.net:16420/railway')
+    DATABASE_URL = os.environ.get('DATABASE_URL', 'postgresql://postgres:HXmzPSGlMEcjpzICIZphyTFuNLcGbAjL@postgres-admt.railway.internal:5432/railway')
     
     # JWT Configuration
     JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'tanque-cheio-secret-2025')
@@ -19,7 +19,7 @@ class Config:
     SESSION_SECRET = os.environ.get('SESSION_SECRET', 'tanque-cheio-session-secret')
     
     # API Configuration
-    API_URL = os.environ.get('API_URL', 'localhost:8080')
+    API_URL = os.environ.get('API_URL', 'https://betc-production.up.railway.app/api')
     NODE_ENV = os.environ.get('NODE_ENV', 'production')
     PORT = int(os.environ.get('PORT', 8080))
     

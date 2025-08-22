@@ -11,7 +11,7 @@ class Config:
 class DevelopmentConfig(Config):
     """Configurações de desenvolvimento."""
     DEBUG = True
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://user:password@localhost/tanquecheio')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://postgres:HXmzPSGlMEcjpzICIZphyTFuNLcGbAjL@postgres-admt.railway.internal:5432/railway')
     SQLALCHEMY_ECHO = False
 
 class TestingConfig(Config):

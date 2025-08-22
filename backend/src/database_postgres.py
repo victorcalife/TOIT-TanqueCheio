@@ -191,7 +191,7 @@ def get_db_stats():
             'fuel_prices': FuelPrice.query.count(),
             'partners': Partner.query.count(),
             'coupons': Coupon.query.count(),
-            'database_url': os.environ.get('DATABASE_URL', 'Not configured')[:50] + '...'
+            'database_url': os.environ.get('DATABASE_URL', 'postgresql://postgres:HXmzPSGlMEcjpzICIZphyTFuNLcGbAjL@postgres-admt.railway.internal:5432/railway')[:50] + '...'
         }
         return stats
     except Exception as e:
