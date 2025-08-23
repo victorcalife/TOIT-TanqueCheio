@@ -8,9 +8,8 @@ from main import create_app
 # Cria a aplicação usando a configuração de produção
 app = create_app('production')
 
-# Wrapper para compatibilidade com Gunicorn
-def application(environ, start_response):
-    return app(environ, start_response)
+# A variável 'application' é o que o Gunicorn procura
+application = app
 
 if __name__ == "__main__":
     # Isso é útil para desenvolvimento local, mas não deve ser usado em produção
