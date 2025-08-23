@@ -6,20 +6,24 @@ import os
 import sys
 import traceback
 from database_postgres import db, init_database, test_connection, get_db_stats
-from config_postgres import config_by_name
+from config_consolidated import get_config, config_by_name
 
 # Configuração do sistema
 sys.path.append(os.path.dirname(__file__))
 
-def create_app(config_name='dev'):
+def create_app(config_name=None):
     """Factory function para criar a aplicação Flask"""
     app = Flask(__name__)
     
     # Configuração da aplicação
-    config_object = config_by_name(config_name)
-    if not config_object:
-        raise ValueError(f"Configuração '{config_name}' não encontrada.")
-    app.config.from_object(config_object)
+    if config_name:
+        config_object = config_by_name(config_name)
+        if not config_object:
+            raise ValueError(f"Configuração '{config_name}' não encontrada.")
+        app.config.from_object(config_object)
+    else:
+        # Usa configuração baseada em ambiente
+        app.config.from_object(get_config())
     
     # Inicializar extensões
     jwt = JWTManager(app)
@@ -35,7 +39,7 @@ def create_app(config_name='dev'):
     # CORS simples
     @app.after_request
     def after_request(response):
-        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Origin', 'https://fetc-production.up.railway.app', 'tanquecheio.toit.com.br', 'fetc-production.up.railway.app')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
         response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
         return response
