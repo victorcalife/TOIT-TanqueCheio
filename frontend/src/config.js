@@ -1,5 +1,5 @@
 // API Configuration
-export const API_BASE_URL = 'https://betc-production.up.railway.app/api';
+export const API_BASE_URL = '/api';
 
 // Frontend URL
 export const FRONTEND_URL = 'https://fetc-production.up.railway.app';

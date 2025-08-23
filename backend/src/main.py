@@ -1,12 +1,17 @@
-from flask import Flask, request, jsonify, send_from_directory
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask import Flask, request, jsonify, send_from_directory, current_app
+from flask_jwt_extended import (
+    JWTManager, create_access_token, create_refresh_token,
+    jwt_required, get_jwt_identity, get_jwt, verify_jwt_in_request
+)
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import sys
 import traceback
+import json
 from database_postgres import db, init_database, test_connection, get_db_stats
 from config_consolidated import get_config, config_by_name
+from functools import wraps
 
 # Configuração do sistema
 sys.path.append(os.path.dirname(__file__))
@@ -36,33 +41,72 @@ def create_app(config_name=None):
         with app.app_context():
             db.create_all()
     
-    # CORS configuration
+    # Configuração CORS para produção
+    @app.before_request
+    def handle_options():
+        if request.method == 'OPTIONS':
+            response = current_app.make_default_options_response()
+            origin = request.headers.get('Origin', '')
+            allowed_origins = [
+                'https://fetc-production.up.railway.app',
+                'https://tanquecheio.toit.com.br'
+            ]
+            
+            if origin in allowed_origins:
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+            return response
+
     @app.after_request
-    def after_request(response):
-        # List of allowed origins
+    def add_cors_headers(response):
+        origin = request.headers.get('Origin', '')
         allowed_origins = [
             'https://fetc-production.up.railway.app',
-            'https://tanquecheio.toit.com.br',
-            'http://localhost:3000'  # For local development
+            'https://tanquecheio.toit.com.br'
         ]
         
-        # Get the origin of the request
-        origin = request.headers.get('Origin')
-        
-        # If the request's origin is in our allowed origins, set it as the allowed origin
         if origin in allowed_origins:
-            response.headers.add('Access-Control-Allow-Origin', origin)
-        
-        # Add CORS headers
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-        
-        # Handle preflight requests
-        if request.method == 'OPTIONS':
-            response.status_code = 200
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
         
         return response
+    
+    # Registrar blueprints
+    from routes.auth import auth_bp
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    
+    # Configuração do JWT
+    @app.before_request
+    @jwt_required(optional=True)
+    def check_token():
+        if request.method != 'OPTIONS' and request.endpoint not in ['login', 'register']:
+            try:
+                verify_jwt_in_request(optional=True)
+            except Exception as e:
+                return jsonify({
+                    'success': False,
+                    'error': 'Token inválido ou expirado'
+                }), 401
+    
+    @app.after_request
+    def refresh_expiring_jwts(response):
+        try:
+            exp_timestamp = get_jwt()["exp"]
+            now = datetime.now(timezone.utc)
+            target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+            if target_timestamp > exp_timestamp:
+                access_token = create_access_token(identity=get_jwt_identity())
+                data = response.get_json()
+                if data and isinstance(data, dict):
+                    data['new_token'] = access_token
+                    response.data = json.dumps(data)
+            return response
+        except (RuntimeError, KeyError):
+            return response
     
     # Health check
     @app.route('/api/health', methods=['GET'])

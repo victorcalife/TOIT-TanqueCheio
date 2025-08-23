@@ -65,8 +65,10 @@ export const AuthProvider = ({ children }) => {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',  // Importante para enviar cookies
         body: JSON.stringify({ email, password })
       })
 
@@ -81,7 +83,9 @@ export const AuthProvider = ({ children }) => {
         setProfile(data.data.profile)
         return { success: true }
       } else {
-        return { success: false, error: data.error || 'Login failed' }
+        const errorMessage = data.error || (data.message || 'Login failed')
+        console.error('Login failed:', errorMessage)
+        return { success: false, error: errorMessage }
       }
     } catch (error) {
       console.error('Login error:', error)
@@ -94,8 +98,10 @@ export const AuthProvider = ({ children }) => {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
+        credentials: 'include',  // Importante para enviar cookies
         body: JSON.stringify(userData)
       })
 
