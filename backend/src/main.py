@@ -36,12 +36,32 @@ def create_app(config_name=None):
         with app.app_context():
             db.create_all()
     
-    # CORS simples
+    # CORS configuration
     @app.after_request
     def after_request(response):
-        response.headers.add('Access-Control-Allow-Origin', 'https://fetc-production.up.railway.app', 'tanquecheio.toit.com.br', 'fetc-production.up.railway.app')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+        # List of allowed origins
+        allowed_origins = [
+            'https://fetc-production.up.railway.app',
+            'https://tanquecheio.toit.com.br',
+            'http://localhost:3000'  # For local development
+        ]
+        
+        # Get the origin of the request
+        origin = request.headers.get('Origin')
+        
+        # If the request's origin is in our allowed origins, set it as the allowed origin
+        if origin in allowed_origins:
+            response.headers.add('Access-Control-Allow-Origin', origin)
+        
+        # Add CORS headers
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        
+        # Handle preflight requests
+        if request.method == 'OPTIONS':
+            response.status_code = 200
+        
         return response
     
     # Health check

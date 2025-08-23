@@ -167,7 +167,7 @@ def create_sample_data():
 def create_app():
     app = Flask(__name__)
     
-    app.config['JWT_SECRET_KEY'] = 'tanque-cheio-secret-2025'
+    app.config['JWT_SECRET_KEY'] = ( 'aouH&9sa&a86dsha*A6doishaoisjao' )
     app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
     
     jwt = JWTManager(app)
