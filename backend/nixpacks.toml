@@ -1,10 +1,11 @@
 [phases.setup]
-nixPkgs = ["gcc", "postgresql_16", "python39", "python39Packages.pip", "python39Packages.gunicorn"]
+nixPkgs = ["gcc", "postgresql_16", "python39", "python39Packages.pip", "python39Packages.setuptools", "python39Packages.wheel", "python39Packages.virtualenv", "python39Packages.gunicorn"]
 
 [phases.install]
 cmds = [
-  "python -m pip install --upgrade pip",
-  "pip install -r requirements.txt gunicorn"
+  "python -m ensurepip --upgrade",
+  "python -m pip install --upgrade pip setuptools wheel",
+  "pip install -r requirements.txt"
 ]
 
 [start]
