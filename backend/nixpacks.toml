@@ -1,12 +1,20 @@
 [phases.setup]
-nixPkgs = ["gcc", "postgresql_16", "python39", "python39Packages.pip", "python39Packages.setuptools", "python39Packages.wheel", "python39Packages.virtualenv", "python39Packages.gunicorn"]
+nixPkgs = ["gcc", "postgresql_16", "python39", "python39Packages.python"]
 
 [phases.install]
 cmds = [
-  "python -m ensurepip --upgrade",
-  "python -m pip install --upgrade pip setuptools wheel",
+  # Create and activate virtual environment
+  "python -m venv /opt/venv",
+  ". /opt/venv/bin/activate",
+  # Install packages in virtual environment
+  "pip install --upgrade pip setuptools wheel",
   "pip install -r requirements.txt"
 ]
+
+# Set the virtual environment path
+[phases.setup.nixpacksEnvironment]
+PATH = "/opt/venv/bin:$PATH"
+VIRTUAL_ENV = "/opt/venv"
 
 [start]
 cmd = "gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 wsgi:application"
