@@ -1,8 +1,11 @@
 [phases.setup]
-nixPkgs = ["gcc", "postgresql_16", "python39", "python39Packages.pip"]
+nixPkgs = ["gcc", "postgresql_16", "python39", "python39Packages.pip", "gunicorn"]
 
 [phases.install]
 cmds = [
   "python -m pip install --upgrade pip",
-  "pip install -r requirements.txt"
+  "pip install -r requirements.txt gunicorn"
 ]
+
+[start]
+cmd = "gunicorn --bind 0.0.0.0:$PORT --workers 1 --timeout 120 wsgi:application"

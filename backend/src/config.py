@@ -2,8 +2,8 @@ import os
 
 class Config:
     """Configurações base."""
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'default-secret-key-for-dev')
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'default-jwt-secret-for-dev')
+    SECRET_KEY = os.environ.get('SECRET_KEY')
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     DEBUG = False
     TESTING = False
@@ -24,16 +24,14 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     """Configurações de produção."""
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'postgresql://postgres:HXmzPSGlMEcjpzICIZphyTFuNLcGbAjL@postgres-admt.railway.internal:5432/railway')
     # Garante que as chaves secretas sejam definidas em produção
-    if not Config.SECRET_KEY or Config.SECRET_KEY == 'default-secret-key-for-dev':
-        raise ValueError("SECRET_KEY não definida para produção.")
-    if not Config.JWT_SECRET_KEY or Config.JWT_SECRET_KEY == 'default-jwt-secret-for-dev':
-        raise ValueError("JWT_SECRET_KEY não definida para produção.")
+    if not Config.SECRET_KEY or Config.SECRET_KEY == ("SECRET_KEY"):
+        raise ValueError("SECRET_KEY")
+    if not Config.JWT_SECRET_KEY or Config.JWT_SECRET_KEY == ("JWT_SECRET_KEY"):
+        raise ValueError("JWT_SECRET_KEY")
 
 # Mapeamento para facilitar a seleção da configuração
 config_by_name = dict(
-    dev=DevelopmentConfig,
-    test=TestingConfig,
-    prod=ProductionConfig
+        production=ProductionConfig
 )

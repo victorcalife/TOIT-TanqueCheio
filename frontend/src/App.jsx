@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import './App.css';
 import { API_BASE_URL } from './config';
+import { useAuth } from './contexts/AuthContext';
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(localStorage.getItem('token'));
+  const { user, token, loading, login, logout, register } = useAuth();
   const [currentView, setCurrentView] = useState('dashboard');
-  const [loading, setLoading] = useState(false);
   
   // Estados GPS
   const [gpsEnabled, setGpsEnabled] = useState(false);
@@ -33,7 +32,6 @@ function App() {
 
   useEffect(() => {
     if (token) {
-      fetchCurrentUser();
       fetchTripStatus();
     }
   }, [token]);
@@ -47,27 +45,6 @@ function App() {
       return () => clearInterval(interval);
     }
   }, [gpsEnabled, activeTrip]);
-
-  const fetchCurrentUser = async () => {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/me`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setUser(data.user);
-      } else {
-        localStorage.removeItem('token');
-        setToken(null);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar usuário:', error);
-    }
-  };
 
   const fetchTripStatus = async () => {
     try {
@@ -92,48 +69,13 @@ function App() {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    setLoading(true);
-
-    try {
-      console.log('Tentando fazer login com:', { email: formData.email });
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
-      });
-
-      console.log('Resposta do servidor:', {
-        status: response.status,
-        statusText: response.statusText
-      });
-
-      const data = await response.json().catch(() => ({}));
-      console.log('Dados da resposta:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || `Erro HTTP: ${response.status}`);
-      }
-
-      if (data.access_token) {
-        setToken(data.access_token);
-        localStorage.setItem('token', data.access_token);
-        setUser(data.user || { email: formData.email });
-        setCurrentView('dashboard');
-        setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
-      } else {
-        throw new Error(data.error || 'Credenciais inválidas');
-      }
-    } catch (error) {
-      console.error('Erro no login:', error);
-      alert(`Falha no login: ${error.message || 'Verifique suas credenciais e tente novamente'}`);
-    } finally {
-      setLoading(false);
+    const { email, password } = formData;
+    const result = await login(email, password);
+    if (result.success) {
+      setCurrentView('dashboard');
+      setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+    } else {
+      alert(result.error || 'Falha no login. Verifique suas credenciais.');
     }
   };
 
@@ -145,45 +87,19 @@ function App() {
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          password: formData.password
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        setToken(data.access_token);
-        localStorage.setItem('token', data.access_token);
-        setUser(data.user);
-        setCurrentView('dashboard');
-        setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
-      } else {
-        alert(data.error || 'Erro no cadastro');
-      }
-    } catch (error) {
-      console.error('Erro no cadastro:', error);
-      alert('Erro de conexão');
-    } finally {
-      setLoading(false);
+    const { name, email, phone, password } = formData;
+    const result = await register({ name, email, phone, password });
+    
+    if (result.success) {
+      setCurrentView('dashboard');
+      setFormData({ name: '', email: '', phone: '', password: '', confirmPassword: '' });
+    } else {
+      alert(result.error || 'Erro no cadastro');
     }
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setUser(null);
+    logout();
     setCurrentView('login');
     setActiveTrip(null);
     setGpsEnabled(false);
@@ -358,7 +274,7 @@ function App() {
     }
   }, []);
 
-  if (!token) {
+  if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md">
@@ -496,13 +412,17 @@ function App() {
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">Olá, {user?.name}</span>
-              <button
-                onClick={handleLogout}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                Sair
-              </button>
+              {user && (
+                <>
+                  <span className="text-gray-600">Olá, {user.name || user.email}</span>
+                  <button
+                    onClick={handleLogout}
+                    className="text-gray-500 hover:text-gray-700"
+                  >
+                    Sair
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

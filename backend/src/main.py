@@ -41,72 +41,110 @@ def create_app(config_name=None):
         with app.app_context():
             db.create_all()
     
-    # Configuração CORS para produção
-    @app.before_request
-    def handle_options():
-        if request.method == 'OPTIONS':
-            response = current_app.make_default_options_response()
-            origin = request.headers.get('Origin', '')
-            allowed_origins = [
-                'https://fetc-production.up.railway.app',
-                'https://tanquecheio.toit.com.br'
-            ]
-            
-            if origin in allowed_origins:
-                response.headers['Access-Control-Allow-Origin'] = origin
-                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
-                response.headers['Access-Control-Allow-Credentials'] = 'true'
-            return response
-
+    # Configuração CORS simplificada e unificada
     @app.after_request
     def add_cors_headers(response):
         origin = request.headers.get('Origin', '')
         allowed_origins = [
             'https://fetc-production.up.railway.app',
-            'https://tanquecheio.toit.com.br'
+            'https://tanquecheio.toit.com.br',
+            'http://tanquecheio.toit.com.br',
+            'https://betc-production.up.railway.app',
+            'https://apitanquecheio.toit.com.br',
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+            'http://localhost:8080',
+            'http://127.0.0.1:8080'
         ]
         
         if origin in allowed_origins:
             response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            
+        # Always add these headers for all responses
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-Session-Id'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+        response.headers['Access-Control-Max-Age'] = '3600'  # Cache preflight for 1 hour
         
+        # Handle preflight requests
+        if request.method == 'OPTIONS':
+            response.status_code = 204
+            return response
+            
         return response
     
     # Registrar blueprints
     from routes.auth import auth_bp
+    from routes.user_profile import profile_bp
+    from routes.gas_stations import gas_stations_bp
+    
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(profile_bp, url_prefix='/api/profile')
+    app.register_blueprint(gas_stations_bp, url_prefix='/api/gas-stations')
     
     # Configuração do JWT
+    @jwt.expired_token_loader
+    def expired_token_callback(jwt_header, jwt_payload):
+        return jsonify({
+            'success': False,
+            'error': 'Token expirado',
+            'is_authenticated': False
+        }), 401
+
+    @jwt.invalid_token_loader
+    def invalid_token_callback(error):
+        return jsonify({
+            'success': False,
+            'error': 'Token inválido',
+            'is_authenticated': False
+        }), 401
+
+    @jwt.unauthorized_loader
+    def missing_token_callback(error):
+        return jsonify({
+            'success': False,
+            'error': 'Token não fornecido',
+            'is_authenticated': False
+        }), 401
+
     @app.before_request
     @jwt_required(optional=True)
     def check_token():
-        if request.method != 'OPTIONS' and request.endpoint not in ['login', 'register']:
-            try:
-                verify_jwt_in_request(optional=True)
-            except Exception as e:
-                return jsonify({
-                    'success': False,
-                    'error': 'Token inválido ou expirado'
-                }), 401
-    
-    @app.after_request
-    def refresh_expiring_jwts(response):
+        # Ignorar verificação para rotas públicas
+        public_routes = ['login', 'register', 'health_check']
+        if request.endpoint in public_routes or request.method == 'OPTIONS':
+            return
+            
+        # Verificar token JWT
         try:
-            exp_timestamp = get_jwt()["exp"]
-            now = datetime.now(timezone.utc)
-            target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
-            if target_timestamp > exp_timestamp:
-                access_token = create_access_token(identity=get_jwt_identity())
-                data = response.get_json()
-                if data and isinstance(data, dict):
-                    data['new_token'] = access_token
-                    response.data = json.dumps(data)
-            return response
-        except (RuntimeError, KeyError):
-            return response
+            verify_jwt_in_request(optional=True)
+            
+            # Verificar se o token está prestes a expirar (menos de 30 minutos)
+            exp_timestamp = get_jwt().get('exp')
+            if exp_timestamp:
+                now = datetime.now(timezone.utc)
+                target_timestamp = datetime.timestamp(now + timedelta(minutes=30))
+                if target_timestamp > exp_timestamp:
+                    # Criar novo token
+                    identity = get_jwt_identity()
+                    new_token = create_access_token(identity=identity, fresh=False)
+                    
+                    # Adicionar novo token ao cabeçalho da resposta
+                    response = jsonify({
+                        'success': True,
+                        'message': 'Token atualizado',
+                        'new_token': new_token
+                    })
+                    response.headers['X-New-Token'] = new_token
+                    return response
+                    
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': 'Falha na autenticação',
+                'details': str(e),
+                'is_authenticated': False
+            }), 401
     
     # Health check
     @app.route('/api/health', methods=['GET'])
@@ -246,50 +284,8 @@ def create_app(config_name=None):
                 'error': f'Erro interno: {str(e)}'
             }), 500
     
-    # Rota de postos de combustível
-    @app.route('/api/gas-stations', methods=['GET'])
-    def get_gas_stations():
-        try:
-            from models.gas_station import GasStation, FuelPrice
-            
-            # Buscar todos os postos ativos
-            stations = GasStation.query.filter_by(is_active=True).all()
-            
-            result = []
-            for station in stations:
-                # Buscar preços de combustível
-                fuel_prices = FuelPrice.query.filter_by(gas_station_id=station.id).all()
-                
-                prices = {}
-                for price in fuel_prices:
-                    prices[price.fuel_type] = {
-                        'price': price.price,
-                        'last_updated': price.last_updated.isoformat() if price.last_updated else None
-                    }
-                
-                result.append({
-                    'id': station.id,
-                    'name': station.name,
-                    'brand': station.brand,
-                    'address': station.address,
-                    'latitude': station.latitude,
-                    'longitude': station.longitude,
-                    'fuel_prices': prices,
-                    'is_active': station.is_active
-                })
-            
-            return jsonify({
-                'success': True,
-                'gas_stations': result,
-                'total': len(result)
-            })
-            
-        except Exception as e:
-            return jsonify({
-                'success': False,
-                'error': f'Erro interno: {str(e)}'
-            }), 500
-    
+    # Rotas de postos de combustível foram movidas para o blueprint gas_stations_bp
+    # que está registrado com o prefixo /api/gas-stations
     # Rota de recomendações
     @app.route('/api/recommendations', methods=['POST'])
     def get_recommendations():
@@ -614,19 +610,18 @@ def create_app(config_name=None):
     
     return app
 
+# Criar a aplicação
+app = create_app(os.getenv('FLASK_CONFIG', 'production'))
+
 # Registrar APIs de inteligência de preços
 try:
     from routes.intelligence_api import intelligence_bp
-    app = create_app()
     app.register_blueprint(intelligence_bp, url_prefix='/api/intelligence')
     print("✅ APIs de inteligência de preços registradas")
 except Exception as e:
     print(f"⚠️ Erro ao registrar APIs de inteligência: {e}")
-    app = create_app()
 
 if __name__ == '__main__':
-    config_name = os.getenv('FLASK_CONFIG', 'dev')
-    app = create_app(config_name)
     port = int(os.environ.get('PORT', 8080))
-    print(f"🚀 Iniciando Tanque Cheio API PostgreSQL no modo '{config_name}' na porta {port}")
+    print(f"🚀 Iniciando Tanque Cheio API PostgreSQL na porta {port}")
     app.run(host='0.0.0.0', port=port)

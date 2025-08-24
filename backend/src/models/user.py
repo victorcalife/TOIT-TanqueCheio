@@ -106,6 +106,14 @@ class User(db.Model):
         """Find user by ID"""
         return User.query.get(user_id)
     
+    @classmethod
+    def create_user(cls, email, password, name, phone=None):
+        """Create a new user with the given credentials"""
+        user = cls(email=email, password=password, name=name, phone=phone)
+        db.session.add(user)
+        db.session.commit()
+        return user
+    
     def __repr__(self):
         return f'<User {self.email}>'
 

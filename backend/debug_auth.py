@@ -91,7 +91,7 @@ def test_auth_endpoint():
     """Testa endpoint de autenticação"""
     try:
         app = Flask(__name__)
-        app.config.from_object(config['development'])
+        app.config.from_object(config['production'])
         
         with app.app_context():
             from src.database import init_database

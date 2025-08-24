@@ -18,7 +18,11 @@ class Config:
         'pool_recycle': 300,
         'pool_timeout': 20,
         'max_overflow': 10,
-        'pool_size': 20
+        'pool_size': 5,
+        'connect_args': {
+            'connect_timeout': 5,
+            'options': '-c statement_timeout=5000'
+        }
     }
     
     # JWT Configuration
